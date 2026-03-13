@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,52 +12,46 @@ import (
 	"github.com/AbhishekSinghDev/student-management/internal/config"
 )
 
-func startServer(server *http.Server) {
-	slog.Info("server listening on", slog.String("address", server.Addr) )
-	err := server.ListenAndServe()
-	if err != nil {
-		log.Fatalf("failed to start server: %s", err.Error())
-	}
-}
-
 func main() {
-	// load config
-	config := config.MustLoad()
+	cfg := config.MustLoad()
 
-	// db setup
-	// setup router
-	router := http.NewServeMux()
-	router.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome to go api"))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
 	})
 
-	// setup server
-
-	// buffered channel because we only need one signal to stop the server
-	doneChannel := make(chan os.Signal, 1)
-
-	signal.Notify(doneChannel, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-
-	server := http.Server{
-		Addr: config.Address,
-		Handler: router,
+	server := &http.Server{
+		Addr:         cfg.HTTPServer.Address,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	go startServer(&server)
+	// Start server in goroutine
+	go func() {
+		logger.Info("server starting", "addr", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("server failed", "err", err)
+			os.Exit(1)
+		}
+	}()
 
-	// passing any signal value in the done channel. this will hold the main function until all go routines stop completely
-	<-doneChannel
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
 
-	slog.Info("shutting down the server")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	// Graceful shutdown — give in-flight requests 30s to finish
+	logger.Info("shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := server.Shutdown(ctx)
-	if err != nil {
-		slog.Error("failed to shutdown the server", slog.String("error", err.Error()))
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("forced shutdown", "err", err)
 	}
 
-	slog.Info("server shutdown successfully")
-
+	logger.Info("server stopped")
 }
