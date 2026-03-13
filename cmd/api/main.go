@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/AbhishekSinghDev/student-management/internal/config"
+	"github.com/AbhishekSinghDev/student-management/internal/http/handlers/health"
+	"github.com/AbhishekSinghDev/student-management/internal/http/handlers/student"
 )
 
 func main() {
@@ -18,9 +20,8 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	mux.HandleFunc("GET /health", health.New())
+	mux.HandleFunc("POST /api/student", student.New())
 
 	server := &http.Server{
 		Addr:         cfg.HTTPServer.Address,
