@@ -6,12 +6,13 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/AbhishekSinghDev/student-management/internal/storage"
 	"github.com/AbhishekSinghDev/student-management/internal/types"
 	"github.com/AbhishekSinghDev/student-management/internal/utils/response"
 	"github.com/go-playground/validator/v10"
 )
 
-func New() http.HandlerFunc {
+func New(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var student types.Student
@@ -35,6 +36,12 @@ func New() http.HandlerFunc {
 			return
 		}
 
-		response.WriteJson(w, http.StatusCreated, map[string]string{"status": "OK"})
+		lastId, creationError := storage.CreateStudent(student.Name, student.Email, student.Age)
+		if creationError != nil {
+			response.WriteJson(w, http.StatusInternalServerError, creationError)
+			return
+		}
+
+		response.WriteJson(w, http.StatusCreated, map[string]int64{"id": lastId})
 	}
 }

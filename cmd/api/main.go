@@ -12,6 +12,7 @@ import (
 	"github.com/AbhishekSinghDev/student-management/internal/config"
 	"github.com/AbhishekSinghDev/student-management/internal/http/handlers/health"
 	"github.com/AbhishekSinghDev/student-management/internal/http/handlers/student"
+	"github.com/AbhishekSinghDev/student-management/internal/storage/sqlite"
 )
 
 func main() {
@@ -19,9 +20,15 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	storage, err := sqlite.New(cfg)
+	if err != nil {
+		logger.Error("failed to initialize storage", "err", err)
+		return
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health.New())
-	mux.HandleFunc("POST /api/student", student.New())
+	mux.HandleFunc("POST /api/student", student.New(storage))
 
 	server := &http.Server{
 		Addr:         cfg.HTTPServer.Address,
