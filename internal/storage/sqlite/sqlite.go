@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/AbhishekSinghDev/student-management/internal/config"
+	"github.com/AbhishekSinghDev/student-management/internal/types"
 	_ "modernc.org/sqlite"
 )
 
@@ -39,7 +40,6 @@ func New(cfg *config.Config) (*Sqlite, error) {
 }
 
 func (s Sqlite) CreateStudent(name string, email string, age int) (int64, error) {
-
 	statement, err := s.Db.Prepare(`INSERT INTO students (name, email, age) VALUES (?, ?, ?)`)
 	if err != nil {
 		return 0, err
@@ -57,4 +57,23 @@ func (s Sqlite) CreateStudent(name string, email string, age int) (int64, error)
 	}
 
 	return lastId, nil
+}
+
+func (s Sqlite) GetStudentById(id int64) (types.Student, error) {
+	statement, err := s.Db.Prepare((`SELECT * FROM students WHERE id = ? LIMIT 1`))
+	if err != nil {
+		return types.Student{}, err
+	}
+	defer statement.Close()
+
+	var student types.Student
+
+
+	err = statement.QueryRow(id).Scan(&student.Id, &student.Name, &student.Email, &student.Age)
+	if err != nil {
+		return types.Student{}, err
+	}
+
+
+	return student, nil
 }
